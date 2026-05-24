@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CDL Checkers</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ===== NAV ===== -->
+  <nav class="nav" id="nav">
+    <a href="index.html" class="nav-logo" aria-label="CDL Checkers home">
+      <span class="cdl">CDL</span><span class="rest">Checkers</span>
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="index.html" class="active">Home</a></li>
+      <li><a href="game.html">Play</a></li>
+      <li><a href="about.html">About</a></li>
+    </ul>
+  </nav>
+
+  <!-- ===== PAGE ===== -->
+  <main class="page">
+
+    <!-- Hero -->
+    <section class="hero" aria-labelledby="hero-heading">
+      <div class="hero-inner">
+        <p class="hero-eyebrow">Strategy &amp; Skill</p>
+        <h1 id="hero-heading">
+          <span class="cdl">CDL</span><span class="rest"> Checkers</span>
+        </h1>
+        <p class="hero-tagline">Classic checkers. Modern feel. No downloads required.</p>
+        <div class="hero-ctas">
+          <a href="game.html?mode=ai" class="btn btn-primary">
+            &#x2699; Play vs Computer
+          </a>
+          <a href="game.html?mode=pvp" class="btn btn-secondary">
+            &#x1F465; Play vs Friend
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- How to Play -->
+    <section class="how-section" aria-labelledby="how-heading">
+      <p class="section-label" id="how-heading">How to Play</p>
+      <div class="how-grid">
+        <div class="how-card">
+          <div class="how-num">01</div>
+          <h3>Move Diagonally</h3>
+          <p>Pieces move one square diagonally forward. Kings can move in any diagonal direction.</p>
+        </div>
+        <div class="how-card">
+          <div class="how-num">02</div>
+          <h3>Capture Opponents</h3>
+          <p>Jump over an enemy piece to capture it. Captures are mandatory when available.</p>
+        </div>
+        <div class="how-card">
+          <div class="how-num">03</div>
+          <h3>Become a King</h3>
+          <p>Reach the opposite back row to crown your piece. Kings move freely in all diagonal directions.</p>
+        </div>
+        <div class="how-card">
+          <div class="how-num">04</div>
+          <h3>Win the Game</h3>
+          <p>Capture all of your opponent's pieces, or leave them with no legal moves remaining.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="game.js"></script>
+</body>
+
+</html>

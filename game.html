@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Play — CDL Checkers</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ===== NAV ===== -->
+  <nav class="nav" id="nav">
+    <a href="index.html" class="nav-logo" aria-label="CDL Checkers home">
+      <span class="cdl">CDL</span><span class="rest">Checkers</span>
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="game.html" class="active">Play</a></li>
+      <li><a href="about.html">About</a></li>
+    </ul>
+  </nav>
+
+  <!-- ===== PAGE ===== -->
+  <main class="page game-page">
+    <div class="game-container">
+
+      <!-- Status bar -->
+      <div class="status-bar" id="status-bar" aria-live="polite">
+        <div class="status-turn">
+          <span class="turn-dot p1" id="turn-dot"></span>
+          <span id="turn-text">Player 1's turn</span>
+        </div>
+        <div class="status-counts">
+          <div class="count-badge">
+            <span class="count-pip p1"></span>
+            <span id="p1-count">12</span>
+          </div>
+          <div class="count-badge">
+            <span class="count-pip p2"></span>
+            <span id="p2-count">12</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Board -->
+      <div class="board-wrap">
+        <div id="board" role="grid" aria-label="Checkers board"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="game-actions">
+        <p class="mode-label">Mode: <span id="mode-label">—</span></p>
+        <button class="btn btn-secondary" id="new-game-btn">&#x21BA; New Game</button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Win overlay -->
+  <div class="win-overlay" id="win-overlay" aria-modal="true" role="dialog" aria-labelledby="win-title">
+    <div class="win-card">
+      <div class="win-title" id="win-title"></div>
+      <p class="win-sub" id="win-sub"></p>
+      <button class="btn btn-primary" id="play-again-btn">&#x21BA; Play Again</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+
+</html>

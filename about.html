@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — CDL Checkers</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ===== NAV ===== -->
+  <nav class="nav" id="nav">
+    <a href="index.html" class="nav-logo" aria-label="CDL Checkers home">
+      <span class="cdl">CDL</span><span class="rest">Checkers</span>
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="game.html">Play</a></li>
+      <li><a href="about.html" class="active">About</a></li>
+    </ul>
+  </nav>
+
+  <!-- ===== PAGE ===== -->
+  <main class="page about-page">
+    <div class="about-inner fade-in">
+      <h1><span style="color:var(--accent)">CDL</span> Checkers</h1>
+      <p>A clean, modern take on the classic board game — built to be fast, fair, and fun whether you're playing solo or
+        challenging a friend.</p>
+
+      <div class="about-divider"></div>
+
+      <h2>Who made this?</h2>
+      <p>CDL Checkers is a project by CDL — a simple site built with vanilla HTML, CSS, and JavaScript. No frameworks,
+        no trackers, no bloat. Just a good game.</p>
+
+      <h2>How does the AI work?</h2>
+      <p>The computer opponent uses a technique called <strong style="color:var(--text)">minimax with alpha-beta
+          pruning</strong>. In plain English: before every move, the AI mentally plays out several turns ahead —
+        imagining all the ways the game could unfold — and picks the move that leads to the best possible outcome for
+        itself.</p>
+      <p>It looks ahead up to 5 moves, which makes it a solid challenge without feeling unfair. It also prioritises
+        capturing your pieces over passive moves, so it will always take a jump if it sees one.</p>
+      <p>The short pause you see before it moves is intentional — it makes the game feel more natural, like playing
+        against a real person who's actually thinking.</p>
+
+      <h2>Can I play on mobile?</h2>
+      <p>Yes. The board and layout are fully responsive and work on any modern browser, phone or desktop.</p>
+
+      <h2>Is there any data collected?</h2>
+      <p>No. The game runs entirely in your browser. Nothing is sent to any server. No accounts, no cookies, no
+        tracking.</p>
+
+      <div class="about-badge">All systems running &mdash; 100% client-side</div>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+
+</html>
