@@ -47,6 +47,7 @@ let mustJumps      = [];
 let gameOver       = false;
 let aiThinking     = false;
 let multiJumpPiece = null;
+let gameMode       = 'ai';   // 'ai' | 'pvp'
 
 /* snapshot of the last board state actually painted to the DOM,
    used for incremental rendering */
@@ -341,10 +342,10 @@ function updateStatus() {
   }
   if (currentTurn === P1) {
     dotEl.className = 'turn-dot p1';
-    textEl.textContent = 'Your turn';
+    textEl.textContent = gameMode === 'pvp' ? "Player 1's turn" : 'Your turn';
   } else {
     dotEl.className = 'turn-dot p2';
-    textEl.textContent = "AI's turn";
+    textEl.textContent = gameMode === 'pvp' ? "Player 2's turn" : "AI's turn";
   }
 }
 
@@ -383,7 +384,8 @@ function resetGame() {
    ============================================================ */
 
 function onCellClick(row, col) {
-  if (gameOver || aiThinking || currentTurn === P2) return;
+  if (gameOver || aiThinking) return;
+  if (gameMode === 'ai' && currentTurn === P2) return;
 
   const piece           = board[idx(row, col)];
   const isCurrentPlayer = isOwnedBy(piece, currentTurn);
@@ -468,7 +470,7 @@ function switchTurn() {
   refreshMustJumps();
   renderBoard();
   updateStatus();
-  if (currentTurn === P2 && !gameOver) triggerAI();
+  if (gameMode === 'ai' && currentTurn === P2 && !gameOver) triggerAI();
 }
 
 function refreshMustJumps() {
@@ -498,13 +500,13 @@ function showWin(winner) {
   const overlay = document.getElementById('win-overlay');
   if (!titleEl || !subEl || !overlay) return;
   if (winner === P1) {
-    titleEl.textContent = 'You Win!';
+    titleEl.textContent = gameMode === 'pvp' ? 'Player 1 Wins!' : 'You Win!';
     titleEl.className   = 'win-title p1';
-    subEl.textContent   = 'You beat the computer. Well played!';
+    subEl.textContent   = gameMode === 'pvp' ? 'Red takes the victory!' : 'You beat the computer. Well played!';
   } else {
-    titleEl.textContent = 'Computer Wins';
+    titleEl.textContent = gameMode === 'pvp' ? 'Player 2 Wins!' : 'Computer Wins';
     titleEl.className   = 'win-title p2';
-    subEl.textContent   = 'The AI got you this time. Try again!';
+    subEl.textContent   = gameMode === 'pvp' ? 'White takes the victory!' : 'The AI got you this time. Try again!';
   }
   setTimeout(() => overlay.classList.add('visible'), 100);
 }
@@ -628,6 +630,14 @@ function evaluate(b, aiPlayer) {
 (function boot() {
   const boardEl = document.getElementById('board');
   if (!boardEl) return;
+
+  /* Read mode from URL — default to AI */
+  const params = new URLSearchParams(window.location.search);
+  gameMode = params.get('mode') === 'pvp' ? 'pvp' : 'ai';
+
+  /* Update the mode label in the UI */
+  const modeLabel = document.getElementById('mode-label');
+  if (modeLabel) modeLabel.textContent = gameMode === 'pvp' ? 'vs Friend' : 'vs Computer';
 
   document.getElementById('new-game-btn').addEventListener('click', resetGame);
   document.getElementById('play-again-btn').addEventListener('click', resetGame);
