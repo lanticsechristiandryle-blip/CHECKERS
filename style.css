@@ -452,8 +452,12 @@ body {
   position: relative;
   cursor: pointer;
   transition: transform 0.15s ease;
-  animation: pieceFadeIn 0.35s ease both;
   flex-shrink: 0;
+  /* No global animation here — only newly inserted pieces animate via .piece-new */
+}
+
+.piece-new {
+  animation: pieceFadeIn 0.3s ease both;
 }
 
 @keyframes pieceFadeIn {
