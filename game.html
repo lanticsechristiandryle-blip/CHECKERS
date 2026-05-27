@@ -7,46 +7,83 @@
   <title>Play — CDL Checkers</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* ===== ONLINE LOBBY OVERLAY ===== */
-    .online-lobby {
+    /* ===== ONLINE LOBBY — fully self-contained, no dependency on style.css ===== */
+    #online-lobby {
       display: none;
       position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      z-index: 200;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.82);
+      z-index: 9999;
       align-items: center;
       justify-content: center;
       padding: 1rem;
     }
 
-    .lobby-card {
-      background: var(--surface, #1a1a2e);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 16px;
-      padding: 2rem;
+    #lobby-card {
+      background: #1a1a2e;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 18px;
+      padding: 2rem 1.75rem;
       width: 100%;
-      max-width: 400px;
+      max-width: 380px;
       text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+      color: #ffffff;
+      font-family: inherit;
     }
 
-    .lobby-card h2 {
+    #lobby-card h2 {
       margin: 0 0 1.5rem;
       font-size: 1.5rem;
-      color: var(--text, #fff);
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    /* Lobby-specific buttons — do NOT use .btn from main CSS */
+    .lbtn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .lbtn:active { transform: scale(0.97); }
+    .lbtn:hover  { opacity: 0.88; }
+
+    .lbtn-primary {
+      background: linear-gradient(135deg, #6c63ff, #3ecfcf);
+      color: #ffffff;
+    }
+
+    .lbtn-secondary {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .lbtn-sm {
+      display: inline-block;
+      width: auto;
+      padding: 0.4rem 0.85rem;
+      font-size: 0.85rem;
+      border-radius: 7px;
+    }
+
+    .lobby-divider {
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 0.85rem;
+      margin: 0.6rem 0;
     }
 
     .lobby-btn-group {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .lobby-divider {
-      color: rgba(255,255,255,0.35);
-      font-size: 0.85rem;
-      margin: 0.25rem 0;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
     }
 
     .join-row {
@@ -56,38 +93,37 @@
 
     .join-row input {
       flex: 1;
-      padding: 0.6rem 0.9rem;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(255,255,255,0.06);
-      color: var(--text, #fff);
-      font-size: 1rem;
-      letter-spacing: 0.1em;
+      padding: 0.7rem 0.9rem;
+      border-radius: 9px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.07);
+      color: #ffffff;
+      font-size: 1.05rem;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       outline: none;
+      font-family: monospace;
     }
+    .join-row input::placeholder { color: rgba(255,255,255,0.3); letter-spacing: 0; font-family: inherit; }
+    .join-row input:focus { border-color: rgba(255, 255, 255, 0.5); }
 
-    .join-row input:focus {
-      border-color: rgba(255,255,255,0.45);
-    }
-
-    .lobby-back {
+    #lobby-back {
       display: inline-block;
       margin-top: 0.75rem;
       font-size: 0.85rem;
-      color: rgba(255,255,255,0.4);
+      color: rgba(255, 255, 255, 0.38);
       text-decoration: none;
+      cursor: pointer;
     }
-
-    .lobby-back:hover { color: rgba(255,255,255,0.7); }
+    #lobby-back:hover { color: rgba(255, 255, 255, 0.65); }
 
     /* Waiting state */
     #lobby-waiting { display: none; }
 
     #lobby-msg {
-      color: rgba(255,255,255,0.7);
+      color: rgba(255, 255, 255, 0.65);
       font-size: 0.95rem;
-      margin-bottom: 1rem;
+      margin: 0 0 1rem;
     }
 
     #room-code-display {
@@ -95,34 +131,36 @@
       align-items: center;
       justify-content: center;
       gap: 0.75rem;
-      background: rgba(255,255,255,0.07);
-      border-radius: 10px;
-      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
       margin-bottom: 1rem;
     }
 
     #lobby-code {
-      font-size: 2rem;
-      font-weight: 700;
-      letter-spacing: 0.25em;
-      color: #fff;
+      font-size: 2.1rem;
+      font-weight: 800;
+      letter-spacing: 0.28em;
+      color: #ffffff;
       font-family: monospace;
     }
 
     #lobby-status {
-      color: rgba(255,255,255,0.55);
+      color: rgba(255, 255, 255, 0.5);
       font-size: 0.9rem;
       margin-top: 0.5rem;
+      min-height: 1.2em;
     }
 
     #lobby-error {
       display: none;
-      color: #ff6b6b;
+      color: #ff7070;
       font-size: 0.875rem;
-      margin-top: 0.75rem;
-      padding: 0.5rem;
-      background: rgba(255,107,107,0.1);
-      border-radius: 6px;
+      margin-top: 0.85rem;
+      padding: 0.55rem 0.75rem;
+      background: rgba(255, 80, 80, 0.1);
+      border-radius: 8px;
     }
   </style>
 </head>
@@ -142,41 +180,41 @@
   </nav>
 
   <!-- ===== ONLINE LOBBY OVERLAY ===== -->
-  <div class="online-lobby" id="online-lobby" role="dialog" aria-modal="true" aria-label="Online lobby">
-    <div class="lobby-card">
+  <div id="online-lobby" role="dialog" aria-modal="true" aria-label="Online lobby">
+    <div id="lobby-card">
       <h2>🌐 Play Online</h2>
 
       <!-- Step 1: Choose create or join -->
       <div id="lobby-choice">
         <div class="lobby-btn-group">
-          <button class="btn btn-primary" onclick="createOnlineRoom()">🏠 Create Room</button>
-          <div class="lobby-divider">— or —</div>
+          <button class="lbtn lbtn-primary" onclick="createOnlineRoom()">🏠 Create a Room</button>
+          <div class="lobby-divider">— or enter a room code —</div>
           <div class="join-row">
             <input
               type="text"
               id="room-code-input"
-              placeholder="Room code"
+              placeholder="e.g. K7MN4P"
               maxlength="6"
               autocomplete="off"
               onkeydown="if(event.key==='Enter') joinOnlineRoomFromInput()"
             />
-            <button class="btn btn-secondary" onclick="joinOnlineRoomFromInput()">Join</button>
+            <button class="lbtn lbtn-secondary lbtn-sm" onclick="joinOnlineRoomFromInput()">Join</button>
           </div>
         </div>
-        <a href="index.html" class="lobby-back">← Back to home</a>
+        <a id="lobby-back" href="index.html">← Back to home</a>
       </div>
 
-      <!-- Step 2: Waiting / connecting -->
+      <!-- Step 2: Waiting / connecting state -->
       <div id="lobby-waiting">
         <p id="lobby-msg"></p>
         <div id="room-code-display">
           <span id="lobby-code"></span>
-          <button id="copy-btn" class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.85rem" onclick="copyRoomCode()">⧉ Copy</button>
+          <button id="copy-btn" class="lbtn lbtn-secondary lbtn-sm" onclick="copyRoomCode()">⧉ Copy</button>
         </div>
         <p id="lobby-status"></p>
       </div>
 
-      <p id="lobby-error"></p>
+      <div id="lobby-error"></div>
     </div>
   </div>
 

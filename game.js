@@ -25,35 +25,35 @@
    ============================================================ */
 
 const EMPTY = 0;
-const P1 = 1;   // red   — human — advances toward row 0
-const P2 = 2;   // white — AI/opponent — advances toward row 7
-const P1K = 3;
-const P2K = 4;
+const P1    = 1;   // red   — human — advances toward row 0
+const P2    = 2;   // white — AI/opponent — advances toward row 7
+const P1K   = 3;
+const P2K   = 4;
 
 const ROWS = 8;
 const COLS = 8;
 
-const ALL_DIRS = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
-const P1_FWDS = [[-1, -1], [-1, 1]];
-const P2_FWDS = [[1, -1], [1, 1]];
+const ALL_DIRS  = [[-1,-1],[-1,1],[1,-1],[1,1]];
+const P1_FWDS   = [[-1,-1],[-1,1]];
+const P2_FWDS   = [[ 1,-1],[ 1,1]];
 
 /* ============================================================
    GAME STATE
    ============================================================ */
 
-let board = [];
-let currentTurn = P1;
-let selected = null;
-let validMoves = [];
-let mustJumps = [];
-let gameOver = false;
-let aiThinking = false;
+let board          = [];
+let currentTurn    = P1;
+let selected       = null;
+let validMoves     = [];
+let mustJumps      = [];
+let gameOver       = false;
+let aiThinking     = false;
 let multiJumpPiece = null;
-let gameMode = 'ai';   // 'ai' | 'pvp' | 'online'
+let gameMode       = 'ai';   // 'ai' | 'pvp' | 'online'
 
-let renderedBoard = null;
-let renderedSel = null;
-let renderedMoves = null;
+let renderedBoard  = null;
+let renderedSel    = null;
+let renderedMoves  = null;
 
 /* ============================================================
    ONLINE MULTIPLAYER — Supabase Realtime Broadcast
@@ -64,13 +64,13 @@ let renderedMoves = null;
    https://supabase.com/dashboard → Settings → API
    ============================================================ */
 
-const SUPABASE_URL = 'https://enydhjrnlmbhqcjmzvig.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVueWRoanJubG1iaHFjam16dmlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTg3OTYsImV4cCI6MjA5NTQzNDc5Nn0.BJMKsFV7h3dynvktp3dhb5urMwi8VBl7RAFFixlz4b8';
+const SUPABASE_URL      = 'https://YOUR_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_ANON_PUBLIC_KEY';
 
-let supabaseClient = null;
+let supabaseClient  = null;
 let supabaseChannel = null;
-let onlineRole = null;   // 'host' | 'guest'
-let roomCode = null;
+let onlineRole      = null;   // 'host' | 'guest'
+let roomCode        = null;
 
 function initSupabase() {
   if (supabaseClient) return supabaseClient;
@@ -96,9 +96,9 @@ async function createOnlineRoom() {
   hideLobbySection('lobby-choice');
   showLobbySection('lobby-waiting');
 
-  roomCode = generateRoomCode();
+  roomCode   = generateRoomCode();
   onlineRole = 'host';
-  gameMode = 'online';
+  gameMode   = 'online';
 
   setLobbyMsg('Share this code with your friend:');
   const codeEl = document.getElementById('lobby-code');
@@ -111,7 +111,7 @@ async function createOnlineRoom() {
 
 async function joinOnlineRoomFromInput() {
   const input = document.getElementById('room-code-input');
-  const code = input ? input.value.trim().toUpperCase() : '';
+  const code  = input ? input.value.trim().toUpperCase() : '';
   if (!code || code.length < 4) {
     showLobbyError('Please enter a valid room code.');
     return;
@@ -124,9 +124,9 @@ async function joinOnlineRoom(code) {
   hideLobbySection('lobby-choice');
   showLobbySection('lobby-waiting');
 
-  roomCode = code;
+  roomCode   = code;
   onlineRole = 'guest';
-  gameMode = 'online';
+  gameMode   = 'online';
 
   setLobbyMsg(`Connecting to room ${code}…`);
   setLobbyStatus('⏳ Joining…');
@@ -181,11 +181,11 @@ function broadcastMove(move) {
     type: 'broadcast',
     event: 'move',
     payload: {
-      fromRow: move.fromRow,
-      fromCol: move.fromCol,
-      toRow: move.toRow,
-      toCol: move.toCol,
-      isJump: move.isJump,
+      fromRow:  move.fromRow,
+      fromCol:  move.fromCol,
+      toRow:    move.toRow,
+      toCol:    move.toCol,
+      isJump:   move.isJump,
       captures: move.captures || []
     }
   });
@@ -250,8 +250,8 @@ function hideLobbyError() {
    HELPERS
    ============================================================ */
 
-const idx = (r, c) => r * COLS + c;
-const isDark = (r, c) => (r + c) % 2 === 1;
+const idx      = (r, c) => r * COLS + c;
+const isDark   = (r, c) => (r + c) % 2 === 1;
 const inBounds = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
 
 const isOwnedBy = (piece, player) => {
@@ -259,13 +259,13 @@ const isOwnedBy = (piece, player) => {
   if (player === P2) return piece === P2 || piece === P2K;
   return false;
 };
-const isEnemy = (piece, player) => piece !== EMPTY && !isOwnedBy(piece, player);
-const isKing = (piece) => piece === P1K || piece === P2K;
+const isEnemy  = (piece, player) => piece !== EMPTY && !isOwnedBy(piece, player);
+const isKing   = (piece) => piece === P1K || piece === P2K;
 
 function getMoveDirs(piece) {
-  if (isKing(piece)) return ALL_DIRS;
-  if (piece === P1) return P1_FWDS;
-  if (piece === P2) return P2_FWDS;
+  if (isKing(piece))   return ALL_DIRS;
+  if (piece === P1)     return P1_FWDS;
+  if (piece === P2)     return P2_FWDS;
   return [];
 }
 
@@ -292,17 +292,15 @@ function buildInitialBoard() {
 
 function getSimpleMovesForPiece(row, col, b) {
   const piece = b[idx(row, col)];
-  const dirs = getMoveDirs(piece);
+  const dirs  = getMoveDirs(piece);
   const moves = [];
 
   if (isKing(piece)) {
     dirs.forEach(([dr, dc]) => {
       let r = row + dr, c = col + dc;
       while (inBounds(r, c) && b[idx(r, c)] === EMPTY) {
-        moves.push({
-          fromRow: row, fromCol: col, toRow: r, toCol: c,
-          isJump: false, captures: []
-        });
+        moves.push({ fromRow: row, fromCol: col, toRow: r, toCol: c,
+                     isJump: false, captures: [] });
         r += dr; c += dc;
       }
     });
@@ -310,10 +308,8 @@ function getSimpleMovesForPiece(row, col, b) {
     dirs.forEach(([dr, dc]) => {
       const nr = row + dr, nc = col + dc;
       if (inBounds(nr, nc) && b[idx(nr, nc)] === EMPTY)
-        moves.push({
-          fromRow: row, fromCol: col, toRow: nr, toCol: nc,
-          isJump: false, captures: []
-        });
+        moves.push({ fromRow: row, fromCol: col, toRow: nr, toCol: nc,
+                     isJump: false, captures: [] });
     });
   }
   return moves;
@@ -335,26 +331,22 @@ function getJumpsForPiece(row, col, b, player, captured = []) {
       const capR = r, capC = c;
       r += dr; c += dc;
       while (inBounds(r, c) && b[idx(r, c)] === EMPTY) {
-        moves.push({
-          fromRow: row, fromCol: col, toRow: r, toCol: c,
-          isJump: true,
-          captures: [...captured, { row: capR, col: capC }]
-        });
+        moves.push({ fromRow: row, fromCol: col, toRow: r, toCol: c,
+                     isJump: true,
+                     captures: [...captured, { row: capR, col: capC }] });
         r += dr; c += dc;
       }
     });
   } else {
     ALL_DIRS.forEach(([dr, dc]) => {
-      const mr = row + dr, mc = col + dc;
-      const lr = row + dr * 2, lc = col + dc * 2;
+      const mr = row + dr,   mc = col + dc;
+      const lr = row + dr*2, lc = col + dc*2;
       if (!inBounds(lr, lc)) return;
       const alreadyCapped = captured.some(cap => cap.row === mr && cap.col === mc);
       if (isEnemy(b[idx(mr, mc)], player) && b[idx(lr, lc)] === EMPTY && !alreadyCapped)
-        moves.push({
-          fromRow: row, fromCol: col, toRow: lr, toCol: lc,
-          isJump: true,
-          captures: [...captured, { row: mr, col: mc }]
-        });
+        moves.push({ fromRow: row, fromCol: col, toRow: lr, toCol: lc,
+                     isJump: true,
+                     captures: [...captured, { row: mr, col: mc }] });
     });
   }
   return moves;
@@ -362,7 +354,7 @@ function getJumpsForPiece(row, col, b, player, captured = []) {
 
 function getMovesForPiece(row, col, b, player) {
   return [...getJumpsForPiece(row, col, b, player),
-  ...getSimpleMovesForPiece(row, col, b)];
+          ...getSimpleMovesForPiece(row, col, b)];
 }
 
 function getAllJumps(b, player) {
@@ -412,7 +404,7 @@ function buildBoard() {
   }
 
   renderedBoard = null;
-  renderedSel = null;
+  renderedSel   = null;
   renderedMoves = null;
 }
 
@@ -420,19 +412,19 @@ function renderBoard() {
   const boardEl = document.getElementById('board');
   if (!boardEl) return;
 
-  const selKey = selected ? `${selected.row},${selected.col}` : '';
+  const selKey   = selected  ? `${selected.row},${selected.col}` : '';
   const moveKeys = new Set(validMoves.map(m => `${m.toRow},${m.toCol}`));
 
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      const i = idx(r, c);
-      const piece = board[i];
+      const i       = idx(r, c);
+      const piece   = board[i];
       const prevPiece = renderedBoard ? renderedBoard[i] : -1;
 
-      const key = `${r},${c}`;
-      const isSel = (selKey === key);
-      const isMove = moveKeys.has(key);
-      const wasSel = renderedSel === key;
+      const key     = `${r},${c}`;
+      const isSel   = (selKey === key);
+      const isMove  = moveKeys.has(key);
+      const wasSel  = renderedSel   === key;
       const wasMove = renderedMoves ? renderedMoves.has(key) : false;
 
       const pieceChanged = piece !== prevPiece;
@@ -443,7 +435,7 @@ function renderBoard() {
       const cell = boardEl.children[i];
       if (!cell) continue;
 
-      cell.classList.toggle('selected', isSel);
+      cell.classList.toggle('selected',   isSel);
       cell.classList.toggle('valid-move', isMove);
 
       if (!pieceChanged) continue;
@@ -455,9 +447,9 @@ function renderBoard() {
         continue;
       }
 
-      const isP1piece = (piece === P1 || piece === P1K);
+      const isP1piece   = (piece === P1 || piece === P1K);
       const isKingPiece = isKing(piece);
-      const newClass = 'piece ' + (isP1piece ? 'p1' : 'p2');
+      const newClass    = 'piece ' + (isP1piece ? 'p1' : 'p2');
 
       if (existing) {
         existing.className = newClass + (isSel ? ' selected-piece' : '');
@@ -496,14 +488,14 @@ function renderBoard() {
   });
 
   renderedBoard = board.slice();
-  renderedSel = selKey;
+  renderedSel   = selKey;
   renderedMoves = moveKeys;
 
   updateCounts();
 }
 
 function updateStatus() {
-  const dotEl = document.getElementById('turn-dot');
+  const dotEl  = document.getElementById('turn-dot');
   const textEl = document.getElementById('turn-text');
   if (!dotEl || !textEl || gameOver) return;
 
@@ -543,15 +535,15 @@ function updateCounts() {
    ============================================================ */
 
 function resetGame() {
-  board = buildInitialBoard();
-  currentTurn = P1;
-  selected = null;
-  validMoves = [];
-  mustJumps = [];
-  gameOver = false;
-  aiThinking = false;
+  board          = buildInitialBoard();
+  currentTurn    = P1;
+  selected       = null;
+  validMoves     = [];
+  mustJumps      = [];
+  gameOver       = false;
+  aiThinking     = false;
   multiJumpPiece = null;
-  renderedBoard = null;
+  renderedBoard  = null;
   hideWinOverlay();
   buildBoard();
   renderBoard();
@@ -573,7 +565,7 @@ function onCellClick(row, col) {
     if (currentTurn !== myPlayer) return;
   }
 
-  const piece = board[idx(row, col)];
+  const piece           = board[idx(row, col)];
   const isCurrentPlayer = isOwnedBy(piece, currentTurn);
 
   if (multiJumpPiece) {
@@ -585,7 +577,7 @@ function onCellClick(row, col) {
   if (isCurrentPlayer) {
     if (mustJumps.length > 0 && !mustJumps.some(m => m.fromRow === row && m.fromCol === col))
       return;
-    selected = { row, col };
+    selected   = { row, col };
     validMoves = getMovesForPiece(row, col, board, currentTurn);
     if (mustJumps.length > 0) validMoves = validMoves.filter(m => m.isJump);
     renderBoard();
@@ -597,7 +589,7 @@ function onCellClick(row, col) {
     if (moveTarget) { executeMove(moveTarget); return; }
   }
 
-  selected = null;
+  selected   = null;
   validMoves = [];
   renderBoard();
 }
@@ -613,7 +605,7 @@ function onCellClick(row, col) {
 function executeMove(move, fromRemote = false) {
   const { fromRow, fromCol, toRow, toCol, captures } = move;
 
-  board[idx(toRow, toCol)] = board[idx(fromRow, fromCol)];
+  board[idx(toRow, toCol)]     = board[idx(fromRow, fromCol)];
   board[idx(fromRow, fromCol)] = EMPTY;
   if (captures) captures.forEach(({ row, col }) => { board[idx(row, col)] = EMPTY; });
 
@@ -625,8 +617,8 @@ function executeMove(move, fromRemote = false) {
     if (furtherJumps.length > 0) {
       if (!fromRemote) {
         // Local player continues clicking through each jump
-        selected = { row: toRow, col: toCol };
-        validMoves = furtherJumps;
+        selected       = { row: toRow, col: toCol };
+        validMoves     = furtherJumps;
         multiJumpPiece = { row: toRow, col: toCol };
         // Broadcast this intermediate jump so opponent sees the piece move
         if (gameMode === 'online') broadcastMove(move);
@@ -645,8 +637,8 @@ function executeMove(move, fromRemote = false) {
   }
 
   multiJumpPiece = null;
-  selected = null;
-  validMoves = [];
+  selected       = null;
+  validMoves     = [];
 
   // Broadcast the final (or only) move in the sequence
   if (!fromRemote && gameMode === 'online') broadcastMove(move);
@@ -657,7 +649,7 @@ function executeMove(move, fromRemote = false) {
 
 function checkKingPromotion(row, col) {
   const piece = board[idx(row, col)];
-  if (piece === P1 && row === 0) { board[idx(row, col)] = P1K; return true; }
+  if (piece === P1 && row === 0)        { board[idx(row, col)] = P1K; return true; }
   if (piece === P2 && row === ROWS - 1) { board[idx(row, col)] = P2K; return true; }
   return false;
 }
@@ -697,24 +689,24 @@ function checkWin() {
 function showWin(winner) {
   gameOver = true;
   const titleEl = document.getElementById('win-title');
-  const subEl = document.getElementById('win-sub');
+  const subEl   = document.getElementById('win-sub');
   const overlay = document.getElementById('win-overlay');
   if (!titleEl || !subEl || !overlay) return;
 
   if (gameMode === 'online') {
     const myPlayer = (onlineRole === 'host') ? P1 : P2;
-    const iWon = (winner === myPlayer);
+    const iWon     = (winner === myPlayer);
     titleEl.textContent = iWon ? 'You Win! 🎉' : 'You Lose!';
-    titleEl.className = 'win-title ' + (winner === P1 ? 'p1' : 'p2');
-    subEl.textContent = iWon ? 'Well played! You beat your opponent.' : 'Better luck next time!';
+    titleEl.className   = 'win-title ' + (winner === P1 ? 'p1' : 'p2');
+    subEl.textContent   = iWon ? 'Well played! You beat your opponent.' : 'Better luck next time!';
   } else if (winner === P1) {
     titleEl.textContent = gameMode === 'pvp' ? 'Player 1 Wins!' : 'You Win!';
-    titleEl.className = 'win-title p1';
-    subEl.textContent = gameMode === 'pvp' ? 'Red takes the victory!' : 'You beat the computer. Well played!';
+    titleEl.className   = 'win-title p1';
+    subEl.textContent   = gameMode === 'pvp' ? 'Red takes the victory!' : 'You beat the computer. Well played!';
   } else {
     titleEl.textContent = gameMode === 'pvp' ? 'Player 2 Wins!' : 'Computer Wins';
-    titleEl.className = 'win-title p2';
-    subEl.textContent = gameMode === 'pvp' ? 'White takes the victory!' : 'The AI got you this time. Try again!';
+    titleEl.className   = 'win-title p2';
+    subEl.textContent   = gameMode === 'pvp' ? 'White takes the victory!' : 'The AI got you this time. Try again!';
   }
   setTimeout(() => overlay.classList.add('visible'), 100);
 }
@@ -744,7 +736,7 @@ function executeAIMove(move) {
   if (gameOver) return;
   const { fromRow, fromCol, toRow, toCol, captures } = move;
 
-  board[idx(toRow, toCol)] = board[idx(fromRow, fromCol)];
+  board[idx(toRow, toCol)]     = board[idx(fromRow, fromCol)];
   board[idx(fromRow, fromCol)] = EMPTY;
   if (captures) captures.forEach(cap => { board[idx(cap.row, cap.col)] = EMPTY; });
   const promoted = checkKingPromotion(toRow, toCol);
@@ -768,10 +760,10 @@ function executeAIMove(move) {
 function applyMove(b, move) {
   const nb = b.slice();
   const { fromRow, fromCol, toRow, toCol, captures } = move;
-  nb[idx(toRow, toCol)] = nb[idx(fromRow, fromCol)];
+  nb[idx(toRow, toCol)]     = nb[idx(fromRow, fromCol)];
   nb[idx(fromRow, fromCol)] = EMPTY;
   if (captures) captures.forEach(cap => { nb[idx(cap.row, cap.col)] = EMPTY; });
-  if (nb[idx(toRow, toCol)] === P1 && toRow === 0) nb[idx(toRow, toCol)] = P1K;
+  if (nb[idx(toRow, toCol)] === P1 && toRow === 0)        nb[idx(toRow, toCol)] = P1K;
   if (nb[idx(toRow, toCol)] === P2 && toRow === ROWS - 1) nb[idx(toRow, toCol)] = P2K;
   return nb;
 }
@@ -789,7 +781,7 @@ function getBestMove(b, player, depth) {
 
 function minimax(b, depth, alpha, beta, maximizing, aiPlayer) {
   const humanPlayer = (aiPlayer === P2) ? P1 : P2;
-  const current = maximizing ? aiPlayer : humanPlayer;
+  const current     = maximizing ? aiPlayer : humanPlayer;
   if (depth === 0) return evaluate(b, aiPlayer);
   const moves = getAllMoves(b, current);
   if (moves.length === 0) return maximizing ? -1000 : 1000;
@@ -799,7 +791,7 @@ function minimax(b, depth, alpha, beta, maximizing, aiPlayer) {
     for (const move of moves) {
       const val = minimax(applyMove(b, move), depth - 1, alpha, beta, false, aiPlayer);
       if (val > maxEval) maxEval = val;
-      if (val > alpha) alpha = val;
+      if (val > alpha)   alpha   = val;
       if (beta <= alpha) break;
     }
     return maxEval;
@@ -808,7 +800,7 @@ function minimax(b, depth, alpha, beta, maximizing, aiPlayer) {
     for (const move of moves) {
       const val = minimax(applyMove(b, move), depth - 1, alpha, beta, true, aiPlayer);
       if (val < minEval) minEval = val;
-      if (val < beta) beta = val;
+      if (val < beta)    beta    = val;
       if (beta <= alpha) break;
     }
     return minEval;
@@ -837,7 +829,7 @@ function evaluate(b, aiPlayer) {
   const boardEl = document.getElementById('board');
   if (!boardEl) return;
 
-  const params = new URLSearchParams(window.location.search);
+  const params    = new URLSearchParams(window.location.search);
   const modeParam = params.get('mode');
 
   document.getElementById('new-game-btn').addEventListener('click', resetGame);
