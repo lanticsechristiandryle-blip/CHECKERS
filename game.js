@@ -1,6 +1,8 @@
 /* ============================================================
    CDL CHECKERS — game.js
-   - Player vs Computer only
+   - Player vs Computer
+   - Player vs Player (local)
+   - Online Multiplayer (Supabase Realtime)
    - Flying kings (bishop-style slide + jump)
    - Regular pieces can capture backwards
    - Incremental DOM rendering (no flicker)
@@ -23,44 +25,233 @@
    ============================================================ */
 
 const EMPTY = 0;
-const P1    = 1;   // red   — human — advances toward row 0
-const P2    = 2;   // white — AI    — advances toward row 7
-const P1K   = 3;
-const P2K   = 4;
+const P1 = 1;   // red   — human — advances toward row 0
+const P2 = 2;   // white — AI/opponent — advances toward row 7
+const P1K = 3;
+const P2K = 4;
 
 const ROWS = 8;
 const COLS = 8;
 
-const ALL_DIRS  = [[-1,-1],[-1,1],[1,-1],[1,1]];
-const P1_FWDS   = [[-1,-1],[-1,1]];   // forward for P1
-const P2_FWDS   = [[ 1,-1],[ 1,1]];   // forward for P2
+const ALL_DIRS = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+const P1_FWDS = [[-1, -1], [-1, 1]];
+const P2_FWDS = [[1, -1], [1, 1]];
 
 /* ============================================================
    GAME STATE
    ============================================================ */
 
-let board          = [];
-let currentTurn    = P1;
-let selected       = null;
-let validMoves     = [];
-let mustJumps      = [];
-let gameOver       = false;
-let aiThinking     = false;
+let board = [];
+let currentTurn = P1;
+let selected = null;
+let validMoves = [];
+let mustJumps = [];
+let gameOver = false;
+let aiThinking = false;
 let multiJumpPiece = null;
-let gameMode       = 'ai';   // 'ai' | 'pvp'
+let gameMode = 'ai';   // 'ai' | 'pvp' | 'online'
 
-/* snapshot of the last board state actually painted to the DOM,
-   used for incremental rendering */
-let renderedBoard  = null;
-let renderedSel    = null;    // stringified selected
-let renderedMoves  = null;    // stringified valid move targets
+let renderedBoard = null;
+let renderedSel = null;
+let renderedMoves = null;
+
+/* ============================================================
+   ONLINE MULTIPLAYER — Supabase Realtime Broadcast
+   ============================================================
+   
+   SETUP: Replace the two placeholders below with your actual
+   Supabase project URL and anon key from:
+   https://supabase.com/dashboard → Settings → API
+   ============================================================ */
+
+const SUPABASE_URL = 'https://supabase.com/dashboard/project/enydhjrnlmbhqcjmzvig';
+const SUPABASE_ANON_KEY = 'sb_publishable_yy87V1rFEGOtjiIVJmRbzA_JsKfDmem';
+
+let supabaseClient = null;
+let supabaseChannel = null;
+let onlineRole = null;   // 'host' | 'guest'
+let roomCode = null;
+
+function initSupabase() {
+  if (supabaseClient) return supabaseClient;
+  if (!window.supabase) {
+    showLobbyError('Supabase library not loaded. Check your internet connection.');
+    return null;
+  }
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return supabaseClient;
+}
+
+function generateRoomCode() {
+  // Unambiguous characters — no 0/O, 1/I/L
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+async function createOnlineRoom() {
+  hideLobbySection('lobby-choice');
+  showLobbySection('lobby-waiting');
+
+  roomCode = generateRoomCode();
+  onlineRole = 'host';
+  gameMode = 'online';
+
+  setLobbyMsg('Share this code with your friend:');
+  const codeEl = document.getElementById('lobby-code');
+  if (codeEl) codeEl.textContent = roomCode;
+  showLobbySection('room-code-display');
+  setLobbyStatus('⏳ Waiting for opponent to join…');
+
+  await connectToRoom(roomCode);
+}
+
+async function joinOnlineRoomFromInput() {
+  const input = document.getElementById('room-code-input');
+  const code = input ? input.value.trim().toUpperCase() : '';
+  if (!code || code.length < 4) {
+    showLobbyError('Please enter a valid room code.');
+    return;
+  }
+  hideLobbyError();
+  await joinOnlineRoom(code);
+}
+
+async function joinOnlineRoom(code) {
+  hideLobbySection('lobby-choice');
+  showLobbySection('lobby-waiting');
+
+  roomCode = code;
+  onlineRole = 'guest';
+  gameMode = 'online';
+
+  setLobbyMsg(`Connecting to room ${code}…`);
+  setLobbyStatus('⏳ Joining…');
+
+  await connectToRoom(code);
+}
+
+async function connectToRoom(code) {
+  const client = initSupabase();
+  if (!client) return;
+
+  const channelName = `cdl-checkers-${code}`;
+  supabaseChannel = client.channel(channelName, {
+    config: { broadcast: { self: false } }
+  });
+
+  supabaseChannel
+    .on('broadcast', { event: 'guest-joined' }, () => {
+      if (onlineRole !== 'host') return;
+      setLobbyStatus('✅ Opponent connected! Starting game…');
+      setTimeout(() => {
+        hideLobby();
+        resetGame();
+      }, 800);
+    })
+    .on('broadcast', { event: 'move' }, ({ payload }) => {
+      applyRemoteMove(payload);
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        if (onlineRole === 'guest') {
+          supabaseChannel.send({
+            type: 'broadcast',
+            event: 'guest-joined',
+            payload: {}
+          });
+          setLobbyStatus('✅ Connected! Starting game…');
+          setTimeout(() => {
+            hideLobby();
+            resetGame();
+          }, 800);
+        }
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        showLobbyError('Connection failed. Check your room code and try again.');
+      }
+    });
+}
+
+function broadcastMove(move) {
+  if (!supabaseChannel || gameMode !== 'online') return;
+  supabaseChannel.send({
+    type: 'broadcast',
+    event: 'move',
+    payload: {
+      fromRow: move.fromRow,
+      fromCol: move.fromCol,
+      toRow: move.toRow,
+      toCol: move.toCol,
+      isJump: move.isJump,
+      captures: move.captures || []
+    }
+  });
+}
+
+function applyRemoteMove(move) {
+  if (gameOver) return;
+  const opponentPlayer = (onlineRole === 'host') ? P2 : P1;
+  if (currentTurn !== opponentPlayer) return;
+  executeMove(move, true);
+}
+
+async function copyRoomCode() {
+  if (!roomCode) return;
+  try {
+    await navigator.clipboard.writeText(roomCode);
+    const btn = document.getElementById('copy-btn');
+    if (btn) {
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = '⧉ Copy'; }, 2000);
+    }
+  } catch (e) { /* fallback: ignore */ }
+}
+
+/* ---- Lobby UI helpers ---- */
+function showLobby() {
+  const el = document.getElementById('online-lobby');
+  if (el) el.style.display = 'flex';
+}
+function hideLobby() {
+  const el = document.getElementById('online-lobby');
+  if (el) el.style.display = 'none';
+  const modeLabel = document.getElementById('mode-label');
+  if (modeLabel) modeLabel.textContent = `vs Online (${onlineRole === 'host' ? 'Red' : 'White'})`;
+}
+function showLobbySection(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = '';
+}
+function hideLobbySection(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+function setLobbyMsg(msg) {
+  const el = document.getElementById('lobby-msg');
+  if (el) el.textContent = msg;
+}
+function setLobbyStatus(msg) {
+  const el = document.getElementById('lobby-status');
+  if (el) el.textContent = msg;
+}
+function showLobbyError(msg) {
+  const el = document.getElementById('lobby-error');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function hideLobbyError() {
+  const el = document.getElementById('lobby-error');
+  if (el) el.style.display = 'none';
+}
 
 /* ============================================================
    HELPERS
    ============================================================ */
 
-const idx      = (r, c) => r * COLS + c;
-const isDark   = (r, c) => (r + c) % 2 === 1;
+const idx = (r, c) => r * COLS + c;
+const isDark = (r, c) => (r + c) % 2 === 1;
 const inBounds = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
 
 const isOwnedBy = (piece, player) => {
@@ -68,14 +259,13 @@ const isOwnedBy = (piece, player) => {
   if (player === P2) return piece === P2 || piece === P2K;
   return false;
 };
-const isEnemy  = (piece, player) => piece !== EMPTY && !isOwnedBy(piece, player);
-const isKing   = (piece) => piece === P1K || piece === P2K;
+const isEnemy = (piece, player) => piece !== EMPTY && !isOwnedBy(piece, player);
+const isKing = (piece) => piece === P1K || piece === P2K;
 
-/* Forward directions for simple moves (kings use all 4) */
 function getMoveDirs(piece) {
-  if (isKing(piece))   return ALL_DIRS;
-  if (piece === P1)     return P1_FWDS;
-  if (piece === P2)     return P2_FWDS;
+  if (isKing(piece)) return ALL_DIRS;
+  if (piece === P1) return P1_FWDS;
+  if (piece === P2) return P2_FWDS;
   return [];
 }
 
@@ -100,22 +290,19 @@ function buildInitialBoard() {
    MOVE GENERATION
    ============================================================ */
 
-/**
- * Simple (non-jump) moves.
- * Kings slide any number of squares along each diagonal (flying king).
- * Regular pieces move one square forward only.
- */
 function getSimpleMovesForPiece(row, col, b) {
   const piece = b[idx(row, col)];
-  const dirs  = getMoveDirs(piece);
+  const dirs = getMoveDirs(piece);
   const moves = [];
 
   if (isKing(piece)) {
     dirs.forEach(([dr, dc]) => {
       let r = row + dr, c = col + dc;
       while (inBounds(r, c) && b[idx(r, c)] === EMPTY) {
-        moves.push({ fromRow: row, fromCol: col, toRow: r, toCol: c,
-                     isJump: false, captures: [] });
+        moves.push({
+          fromRow: row, fromCol: col, toRow: r, toCol: c,
+          isJump: false, captures: []
+        });
         r += dr; c += dc;
       }
     });
@@ -123,29 +310,21 @@ function getSimpleMovesForPiece(row, col, b) {
     dirs.forEach(([dr, dc]) => {
       const nr = row + dr, nc = col + dc;
       if (inBounds(nr, nc) && b[idx(nr, nc)] === EMPTY)
-        moves.push({ fromRow: row, fromCol: col, toRow: nr, toCol: nc,
-                     isJump: false, captures: [] });
+        moves.push({
+          fromRow: row, fromCol: col, toRow: nr, toCol: nc,
+          isJump: false, captures: []
+        });
     });
   }
   return moves;
 }
 
-/**
- * Jump moves.
- *
- * Regular pieces: capture in ALL 4 diagonals (can capture backwards),
- *   but land exactly 2 squares away.
- *
- * Flying kings: scan along each diagonal past empty squares until an enemy
- *   is found, then offer every empty landing square beyond it.
- */
 function getJumpsForPiece(row, col, b, player, captured = []) {
   const piece = b[idx(row, col)];
   const moves = [];
 
   if (isKing(piece)) {
     ALL_DIRS.forEach(([dr, dc]) => {
-      /* Slide past empty squares to find the first blocker */
       let r = row + dr, c = col + dc;
       while (inBounds(r, c) && b[idx(r, c)] === EMPTY) { r += dr; c += dc; }
 
@@ -154,26 +333,28 @@ function getJumpsForPiece(row, col, b, player, captured = []) {
       if (!isEnemy(b[idx(r, c)], player) || alreadyCapped) return;
 
       const capR = r, capC = c;
-      /* Landing squares: any empty square beyond the captured piece */
       r += dr; c += dc;
       while (inBounds(r, c) && b[idx(r, c)] === EMPTY) {
-        moves.push({ fromRow: row, fromCol: col, toRow: r, toCol: c,
-                     isJump: true,
-                     captures: [...captured, { row: capR, col: capC }] });
+        moves.push({
+          fromRow: row, fromCol: col, toRow: r, toCol: c,
+          isJump: true,
+          captures: [...captured, { row: capR, col: capC }]
+        });
         r += dr; c += dc;
       }
     });
   } else {
-    /* Regular piece — all 4 diagonal directions for captures */
     ALL_DIRS.forEach(([dr, dc]) => {
-      const mr = row + dr,   mc = col + dc;
-      const lr = row + dr*2, lc = col + dc*2;
+      const mr = row + dr, mc = col + dc;
+      const lr = row + dr * 2, lc = col + dc * 2;
       if (!inBounds(lr, lc)) return;
       const alreadyCapped = captured.some(cap => cap.row === mr && cap.col === mc);
       if (isEnemy(b[idx(mr, mc)], player) && b[idx(lr, lc)] === EMPTY && !alreadyCapped)
-        moves.push({ fromRow: row, fromCol: col, toRow: lr, toCol: lc,
-                     isJump: true,
-                     captures: [...captured, { row: mr, col: mc }] });
+        moves.push({
+          fromRow: row, fromCol: col, toRow: lr, toCol: lc,
+          isJump: true,
+          captures: [...captured, { row: mr, col: mc }]
+        });
     });
   }
   return moves;
@@ -181,7 +362,7 @@ function getJumpsForPiece(row, col, b, player, captured = []) {
 
 function getMovesForPiece(row, col, b, player) {
   return [...getJumpsForPiece(row, col, b, player),
-          ...getSimpleMovesForPiece(row, col, b)];
+  ...getSimpleMovesForPiece(row, col, b)];
 }
 
 function getAllJumps(b, player) {
@@ -208,11 +389,10 @@ function getAllMoves(b, player) {
 }
 
 /* ============================================================
-   RENDERING  — incremental (no full DOM wipe = no flicker)
+   RENDERING — incremental (no full DOM wipe = no flicker)
    ============================================================ */
 
 function buildBoard() {
-  /* Full initial build — called once */
   const boardEl = document.getElementById('board');
   if (!boardEl) return;
   boardEl.innerHTML = '';
@@ -231,9 +411,8 @@ function buildBoard() {
     }
   }
 
-  /* Force full repaint on next renderBoard call */
   renderedBoard = null;
-  renderedSel   = null;
+  renderedSel = null;
   renderedMoves = null;
 }
 
@@ -241,37 +420,34 @@ function renderBoard() {
   const boardEl = document.getElementById('board');
   if (!boardEl) return;
 
-  const selKey   = selected  ? `${selected.row},${selected.col}` : '';
+  const selKey = selected ? `${selected.row},${selected.col}` : '';
   const moveKeys = new Set(validMoves.map(m => `${m.toRow},${m.toCol}`));
 
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      const i       = idx(r, c);
-      const piece   = board[i];
-      const prevPiece = renderedBoard ? renderedBoard[i] : -1; // -1 = force update
+      const i = idx(r, c);
+      const piece = board[i];
+      const prevPiece = renderedBoard ? renderedBoard[i] : -1;
 
-      const key     = `${r},${c}`;
-      const isSel   = (selKey === key);
-      const isMove  = moveKeys.has(key);
-      const wasSel  = renderedSel   === key;
+      const key = `${r},${c}`;
+      const isSel = (selKey === key);
+      const isMove = moveKeys.has(key);
+      const wasSel = renderedSel === key;
       const wasMove = renderedMoves ? renderedMoves.has(key) : false;
 
       const pieceChanged = piece !== prevPiece;
       const stateChanged = isSel !== wasSel || isMove !== wasMove;
 
-      if (!pieceChanged && !stateChanged) continue; // nothing to do
+      if (!pieceChanged && !stateChanged) continue;
 
       const cell = boardEl.children[i];
       if (!cell) continue;
 
-      /* ---- Highlight classes ---- */
-      cell.classList.toggle('selected',   isSel);
+      cell.classList.toggle('selected', isSel);
       cell.classList.toggle('valid-move', isMove);
 
-      if (!pieceChanged) continue; // highlight only, no piece rebuild
+      if (!pieceChanged) continue;
 
-      /* ---- Piece content ---- */
-      /* Remove existing piece element if any */
       const existing = cell.querySelector('.piece');
 
       if (piece === EMPTY) {
@@ -284,7 +460,6 @@ function renderBoard() {
       const newClass = 'piece ' + (isP1piece ? 'p1' : 'p2');
 
       if (existing) {
-        /* Piece already present — just update class and crown */
         existing.className = newClass + (isSel ? ' selected-piece' : '');
         const hasCrown = !!existing.querySelector('.king-crown');
         if (isKingPiece && !hasCrown) {
@@ -297,10 +472,8 @@ function renderBoard() {
           existing.querySelector('.king-crown').remove();
         }
       } else {
-        /* New piece — create with fade-in animation */
         const pieceEl = document.createElement('div');
         pieceEl.className = newClass + ' piece-new' + (isSel ? ' selected-piece' : '');
-        /* Remove animation class after it plays so future re-renders don't retrigger it */
         pieceEl.addEventListener('animationend', () => pieceEl.classList.remove('piece-new'), { once: true });
 
         if (isKingPiece) {
@@ -315,7 +488,6 @@ function renderBoard() {
     }
   }
 
-  /* Update selected-piece highlight separately (highlight only, no re-create) */
   boardEl.querySelectorAll('.piece').forEach(el => {
     const cell = el.parentElement;
     const r = +cell.dataset.row, c = +cell.dataset.col;
@@ -324,14 +496,14 @@ function renderBoard() {
   });
 
   renderedBoard = board.slice();
-  renderedSel   = selKey;
+  renderedSel = selKey;
   renderedMoves = moveKeys;
 
   updateCounts();
 }
 
 function updateStatus() {
-  const dotEl  = document.getElementById('turn-dot');
+  const dotEl = document.getElementById('turn-dot');
   const textEl = document.getElementById('turn-text');
   if (!dotEl || !textEl || gameOver) return;
 
@@ -340,6 +512,14 @@ function updateStatus() {
     textEl.innerHTML = 'AI is thinking <span class="thinking"><span></span><span></span><span></span></span>';
     return;
   }
+
+  if (gameMode === 'online') {
+    const myPlayer = (onlineRole === 'host') ? P1 : P2;
+    dotEl.className = 'turn-dot ' + (currentTurn === P1 ? 'p1' : 'p2');
+    textEl.textContent = (currentTurn === myPlayer) ? 'Your turn' : "Opponent's turn…";
+    return;
+  }
+
   if (currentTurn === P1) {
     dotEl.className = 'turn-dot p1';
     textEl.textContent = gameMode === 'pvp' ? "Player 1's turn" : 'Your turn';
@@ -363,18 +543,18 @@ function updateCounts() {
    ============================================================ */
 
 function resetGame() {
-  board          = buildInitialBoard();
-  currentTurn    = P1;
-  selected       = null;
-  validMoves     = [];
-  mustJumps      = [];
-  gameOver       = false;
-  aiThinking     = false;
+  board = buildInitialBoard();
+  currentTurn = P1;
+  selected = null;
+  validMoves = [];
+  mustJumps = [];
+  gameOver = false;
+  aiThinking = false;
   multiJumpPiece = null;
-  renderedBoard  = null;
+  renderedBoard = null;
   hideWinOverlay();
-  buildBoard();     // rebuild empty cells
-  renderBoard();    // paint pieces
+  buildBoard();
+  renderBoard();
   refreshMustJumps();
   updateStatus();
 }
@@ -387,35 +567,37 @@ function onCellClick(row, col) {
   if (gameOver || aiThinking) return;
   if (gameMode === 'ai' && currentTurn === P2) return;
 
-  const piece           = board[idx(row, col)];
+  // Online: block moves when it's the opponent's turn
+  if (gameMode === 'online') {
+    const myPlayer = (onlineRole === 'host') ? P1 : P2;
+    if (currentTurn !== myPlayer) return;
+  }
+
+  const piece = board[idx(row, col)];
   const isCurrentPlayer = isOwnedBy(piece, currentTurn);
 
-  /* Mid multi-jump */
   if (multiJumpPiece) {
     const moveTarget = validMoves.find(m => m.toRow === row && m.toCol === col);
     if (moveTarget) executeMove(moveTarget);
     return;
   }
 
-  /* Select own piece */
   if (isCurrentPlayer) {
     if (mustJumps.length > 0 && !mustJumps.some(m => m.fromRow === row && m.fromCol === col))
       return;
-    selected   = { row, col };
+    selected = { row, col };
     validMoves = getMovesForPiece(row, col, board, currentTurn);
     if (mustJumps.length > 0) validMoves = validMoves.filter(m => m.isJump);
     renderBoard();
     return;
   }
 
-  /* Move to valid target */
   if (selected) {
     const moveTarget = validMoves.find(m => m.toRow === row && m.toCol === col);
     if (moveTarget) { executeMove(moveTarget); return; }
   }
 
-  /* Deselect */
-  selected   = null;
+  selected = null;
   validMoves = [];
   renderBoard();
 }
@@ -424,10 +606,14 @@ function onCellClick(row, col) {
    MOVE EXECUTION
    ============================================================ */
 
-function executeMove(move) {
+/**
+ * @param {object}  move       - The move object to execute
+ * @param {boolean} fromRemote - true when the move came from the online opponent
+ */
+function executeMove(move, fromRemote = false) {
   const { fromRow, fromCol, toRow, toCol, captures } = move;
 
-  board[idx(toRow, toCol)]     = board[idx(fromRow, fromCol)];
+  board[idx(toRow, toCol)] = board[idx(fromRow, fromCol)];
   board[idx(fromRow, fromCol)] = EMPTY;
   if (captures) captures.forEach(({ row, col }) => { board[idx(row, col)] = EMPTY; });
 
@@ -437,18 +623,33 @@ function executeMove(move) {
   if (move.isJump && !promoted) {
     const furtherJumps = getJumpsForPiece(toRow, toCol, board, currentTurn);
     if (furtherJumps.length > 0) {
-      selected       = { row: toRow, col: toCol };
-      validMoves     = furtherJumps;
-      multiJumpPiece = { row: toRow, col: toCol };
-      renderBoard();
-      updateStatus();
-      return;
+      if (!fromRemote) {
+        // Local player continues clicking through each jump
+        selected = { row: toRow, col: toCol };
+        validMoves = furtherJumps;
+        multiJumpPiece = { row: toRow, col: toCol };
+        // Broadcast this intermediate jump so opponent sees the piece move
+        if (gameMode === 'online') broadcastMove(move);
+        renderBoard();
+        updateStatus();
+        return;
+      } else {
+        // Remote player's intermediate jump — render the intermediate state,
+        // then wait for the next broadcast (don't switch turns yet)
+        selected = null; validMoves = []; multiJumpPiece = null;
+        renderBoard();
+        updateStatus();
+        return;
+      }
     }
   }
 
   multiJumpPiece = null;
-  selected       = null;
-  validMoves     = [];
+  selected = null;
+  validMoves = [];
+
+  // Broadcast the final (or only) move in the sequence
+  if (!fromRemote && gameMode === 'online') broadcastMove(move);
 
   if (checkWin()) return;
   switchTurn();
@@ -456,7 +657,7 @@ function executeMove(move) {
 
 function checkKingPromotion(row, col) {
   const piece = board[idx(row, col)];
-  if (piece === P1 && row === 0)        { board[idx(row, col)] = P1K; return true; }
+  if (piece === P1 && row === 0) { board[idx(row, col)] = P1K; return true; }
   if (piece === P2 && row === ROWS - 1) { board[idx(row, col)] = P2K; return true; }
   return false;
 }
@@ -496,17 +697,24 @@ function checkWin() {
 function showWin(winner) {
   gameOver = true;
   const titleEl = document.getElementById('win-title');
-  const subEl   = document.getElementById('win-sub');
+  const subEl = document.getElementById('win-sub');
   const overlay = document.getElementById('win-overlay');
   if (!titleEl || !subEl || !overlay) return;
-  if (winner === P1) {
+
+  if (gameMode === 'online') {
+    const myPlayer = (onlineRole === 'host') ? P1 : P2;
+    const iWon = (winner === myPlayer);
+    titleEl.textContent = iWon ? 'You Win! 🎉' : 'You Lose!';
+    titleEl.className = 'win-title ' + (winner === P1 ? 'p1' : 'p2');
+    subEl.textContent = iWon ? 'Well played! You beat your opponent.' : 'Better luck next time!';
+  } else if (winner === P1) {
     titleEl.textContent = gameMode === 'pvp' ? 'Player 1 Wins!' : 'You Win!';
-    titleEl.className   = 'win-title p1';
-    subEl.textContent   = gameMode === 'pvp' ? 'Red takes the victory!' : 'You beat the computer. Well played!';
+    titleEl.className = 'win-title p1';
+    subEl.textContent = gameMode === 'pvp' ? 'Red takes the victory!' : 'You beat the computer. Well played!';
   } else {
     titleEl.textContent = gameMode === 'pvp' ? 'Player 2 Wins!' : 'Computer Wins';
-    titleEl.className   = 'win-title p2';
-    subEl.textContent   = gameMode === 'pvp' ? 'White takes the victory!' : 'The AI got you this time. Try again!';
+    titleEl.className = 'win-title p2';
+    subEl.textContent = gameMode === 'pvp' ? 'White takes the victory!' : 'The AI got you this time. Try again!';
   }
   setTimeout(() => overlay.classList.add('visible'), 100);
 }
@@ -536,7 +744,7 @@ function executeAIMove(move) {
   if (gameOver) return;
   const { fromRow, fromCol, toRow, toCol, captures } = move;
 
-  board[idx(toRow, toCol)]     = board[idx(fromRow, fromCol)];
+  board[idx(toRow, toCol)] = board[idx(fromRow, fromCol)];
   board[idx(fromRow, fromCol)] = EMPTY;
   if (captures) captures.forEach(cap => { board[idx(cap.row, cap.col)] = EMPTY; });
   const promoted = checkKingPromotion(toRow, toCol);
@@ -560,10 +768,10 @@ function executeAIMove(move) {
 function applyMove(b, move) {
   const nb = b.slice();
   const { fromRow, fromCol, toRow, toCol, captures } = move;
-  nb[idx(toRow, toCol)]     = nb[idx(fromRow, fromCol)];
+  nb[idx(toRow, toCol)] = nb[idx(fromRow, fromCol)];
   nb[idx(fromRow, fromCol)] = EMPTY;
   if (captures) captures.forEach(cap => { nb[idx(cap.row, cap.col)] = EMPTY; });
-  if (nb[idx(toRow, toCol)] === P1 && toRow === 0)        nb[idx(toRow, toCol)] = P1K;
+  if (nb[idx(toRow, toCol)] === P1 && toRow === 0) nb[idx(toRow, toCol)] = P1K;
   if (nb[idx(toRow, toCol)] === P2 && toRow === ROWS - 1) nb[idx(toRow, toCol)] = P2K;
   return nb;
 }
@@ -581,7 +789,7 @@ function getBestMove(b, player, depth) {
 
 function minimax(b, depth, alpha, beta, maximizing, aiPlayer) {
   const humanPlayer = (aiPlayer === P2) ? P1 : P2;
-  const current     = maximizing ? aiPlayer : humanPlayer;
+  const current = maximizing ? aiPlayer : humanPlayer;
   if (depth === 0) return evaluate(b, aiPlayer);
   const moves = getAllMoves(b, current);
   if (moves.length === 0) return maximizing ? -1000 : 1000;
@@ -591,7 +799,7 @@ function minimax(b, depth, alpha, beta, maximizing, aiPlayer) {
     for (const move of moves) {
       const val = minimax(applyMove(b, move), depth - 1, alpha, beta, false, aiPlayer);
       if (val > maxEval) maxEval = val;
-      if (val > alpha)   alpha   = val;
+      if (val > alpha) alpha = val;
       if (beta <= alpha) break;
     }
     return maxEval;
@@ -600,7 +808,7 @@ function minimax(b, depth, alpha, beta, maximizing, aiPlayer) {
     for (const move of moves) {
       const val = minimax(applyMove(b, move), depth - 1, alpha, beta, true, aiPlayer);
       if (val < minEval) minEval = val;
-      if (val < beta)    beta    = val;
+      if (val < beta) beta = val;
       if (beta <= alpha) break;
     }
     return minEval;
@@ -613,10 +821,8 @@ function evaluate(b, aiPlayer) {
     if (piece === EMPTY) return;
     const r = Math.floor(i / COLS), c = i % COLS;
     let val = isKing(piece) ? 3.0 : 1.0;
-    /* Advancement bonus */
     if (piece === P1) val += (ROWS - 1 - r) * 0.06;
     if (piece === P2) val += r * 0.06;
-    /* Center control */
     val += (7 - (Math.abs(c - 3.5) + Math.abs(r - 3.5))) * 0.02;
     score += isOwnedBy(piece, aiPlayer) ? val : -val;
   });
@@ -631,16 +837,26 @@ function evaluate(b, aiPlayer) {
   const boardEl = document.getElementById('board');
   if (!boardEl) return;
 
-  /* Read mode from URL — default to AI */
   const params = new URLSearchParams(window.location.search);
-  gameMode = params.get('mode') === 'pvp' ? 'pvp' : 'ai';
-
-  /* Update the mode label in the UI */
-  const modeLabel = document.getElementById('mode-label');
-  if (modeLabel) modeLabel.textContent = gameMode === 'pvp' ? 'vs Friend' : 'vs Computer';
+  const modeParam = params.get('mode');
 
   document.getElementById('new-game-btn').addEventListener('click', resetGame);
   document.getElementById('play-again-btn').addEventListener('click', resetGame);
+
+  if (modeParam === 'online') {
+    gameMode = 'online';
+    const modeLabel = document.getElementById('mode-label');
+    if (modeLabel) modeLabel.textContent = 'vs Online';
+    buildBoard();
+    renderBoard();
+    showLobby();   // Show lobby overlay — game starts after both players connect
+    return;
+  }
+
+  gameMode = modeParam === 'pvp' ? 'pvp' : 'ai';
+
+  const modeLabel = document.getElementById('mode-label');
+  if (modeLabel) modeLabel.textContent = gameMode === 'pvp' ? 'vs Friend' : 'vs Computer';
 
   resetGame();
 })();

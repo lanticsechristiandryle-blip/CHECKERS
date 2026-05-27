@@ -6,6 +6,125 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Play — CDL Checkers</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ===== ONLINE LOBBY OVERLAY ===== */
+    .online-lobby {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .lobby-card {
+      background: var(--surface, #1a1a2e);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .lobby-card h2 {
+      margin: 0 0 1.5rem;
+      font-size: 1.5rem;
+      color: var(--text, #fff);
+    }
+
+    .lobby-btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .lobby-divider {
+      color: rgba(255,255,255,0.35);
+      font-size: 0.85rem;
+      margin: 0.25rem 0;
+    }
+
+    .join-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .join-row input {
+      flex: 1;
+      padding: 0.6rem 0.9rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.06);
+      color: var(--text, #fff);
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    .join-row input:focus {
+      border-color: rgba(255,255,255,0.45);
+    }
+
+    .lobby-back {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.4);
+      text-decoration: none;
+    }
+
+    .lobby-back:hover { color: rgba(255,255,255,0.7); }
+
+    /* Waiting state */
+    #lobby-waiting { display: none; }
+
+    #lobby-msg {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+    }
+
+    #room-code-display {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      background: rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    #lobby-code {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      color: #fff;
+      font-family: monospace;
+    }
+
+    #lobby-status {
+      color: rgba(255,255,255,0.55);
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+
+    #lobby-error {
+      display: none;
+      color: #ff6b6b;
+      font-size: 0.875rem;
+      margin-top: 0.75rem;
+      padding: 0.5rem;
+      background: rgba(255,107,107,0.1);
+      border-radius: 6px;
+    }
+  </style>
 </head>
 
 <body>
@@ -21,6 +140,45 @@
       <li><a href="about.html">About</a></li>
     </ul>
   </nav>
+
+  <!-- ===== ONLINE LOBBY OVERLAY ===== -->
+  <div class="online-lobby" id="online-lobby" role="dialog" aria-modal="true" aria-label="Online lobby">
+    <div class="lobby-card">
+      <h2>🌐 Play Online</h2>
+
+      <!-- Step 1: Choose create or join -->
+      <div id="lobby-choice">
+        <div class="lobby-btn-group">
+          <button class="btn btn-primary" onclick="createOnlineRoom()">🏠 Create Room</button>
+          <div class="lobby-divider">— or —</div>
+          <div class="join-row">
+            <input
+              type="text"
+              id="room-code-input"
+              placeholder="Room code"
+              maxlength="6"
+              autocomplete="off"
+              onkeydown="if(event.key==='Enter') joinOnlineRoomFromInput()"
+            />
+            <button class="btn btn-secondary" onclick="joinOnlineRoomFromInput()">Join</button>
+          </div>
+        </div>
+        <a href="index.html" class="lobby-back">← Back to home</a>
+      </div>
+
+      <!-- Step 2: Waiting / connecting -->
+      <div id="lobby-waiting">
+        <p id="lobby-msg"></p>
+        <div id="room-code-display">
+          <span id="lobby-code"></span>
+          <button id="copy-btn" class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.85rem" onclick="copyRoomCode()">⧉ Copy</button>
+        </div>
+        <p id="lobby-status"></p>
+      </div>
+
+      <p id="lobby-error"></p>
+    </div>
+  </div>
 
   <!-- ===== PAGE ===== -->
   <main class="page game-page">
@@ -67,6 +225,8 @@
     </div>
   </div>
 
+  <!-- Supabase JS (required for online multiplayer) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="game.js"></script>
 </body>
 
