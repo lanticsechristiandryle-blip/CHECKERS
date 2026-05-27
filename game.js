@@ -64,8 +64,8 @@ let renderedMoves = null;
    https://supabase.com/dashboard → Settings → API
    ============================================================ */
 
-const SUPABASE_URL = 'https://supabase.com/dashboard/project/enydhjrnlmbhqcjmzvig';
-const SUPABASE_ANON_KEY = 'sb_publishable_yy87V1rFEGOtjiIVJmRbzA_JsKfDmem';
+const SUPABASE_URL = 'https://enydhjrnlmbhqcjmzvig.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVueWRoanJubG1iaHFjam16dmlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTg3OTYsImV4cCI6MjA5NTQzNDc5Nn0.BJMKsFV7h3dynvktp3dhb5urMwi8VBl7RAFFixlz4b8';
 
 let supabaseClient = null;
 let supabaseChannel = null;
