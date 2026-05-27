@@ -223,7 +223,9 @@ function hideLobby() {
 }
 function showLobbySection(id) {
   const el = document.getElementById(id);
-  if (el) el.style.display = '';
+  if (!el) return;
+  // room-code-display uses flex; everything else uses block
+  el.style.display = (id === 'room-code-display') ? 'flex' : 'block';
 }
 function hideLobbySection(id) {
   const el = document.getElementById(id);
